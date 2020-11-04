@@ -79,11 +79,10 @@ template <class IntegerType, class FloatType> struct Lattice {
 
     nbonds = bond_counter;
 
-    for (auto i = 0; i < active_sites; i ++) {
+    for (auto i = 0; i < active_sites; i++) {
       if (prng.randf() < 0.5) {
         spins.push_back(1);
-      }
-      else {
+      } else {
         spins.push_back(-1);
       }
     }
