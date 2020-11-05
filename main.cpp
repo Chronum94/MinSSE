@@ -7,10 +7,10 @@
 #include "SmallPRNG/prng.h"
 
 int main(int argc, char *argv[]) {
-  SimulationInput<int, float> sim_input{4, 4, 2, 0.0};
-  sim_input.nbins = 3;
-  sim_input.msteps = 20;
-  sim_input.isteps = 20;
+  SimulationInput<int, float> sim_input{32, 32, 4, 0.2};
+  sim_input.nbins = 100;
+  sim_input.msteps = 1000;
+  sim_input.isteps = 1000;
   sim_input.seed = 14746845679U;
 
   std::cout << sim_input << std::endl;
@@ -23,16 +23,16 @@ int main(int argc, char *argv[]) {
   prng<4, uint32_t, xorshift128> myprng;
   // myprng.set_state(34);
   sim_lattice.initialize(myprng);
-//   for (auto e : sim_lattice.spin_mask) {
-//     std::cout << "Mask: " << e << "\n";
-//   }
+  //   for (auto e : sim_lattice.spin_mask) {
+  //     std::cout << "Mask: " << e << "\n";
+  //   }
 
-  std::cout << "Bonds:\n";
-  for (auto bond : sim_lattice.bondsites) {
-    std::cout << bond.s1 << " " << bond.s2 << "\t";
-    std::cout << static_cast<int>(sim_lattice.spins[bond.s1]) << " "
-              << static_cast<int>(sim_lattice.spins[bond.s2]) << "\n";
-  }
+  //   std::cout << "Bonds:\n";
+  //   for (auto bond : sim_lattice.bondsites) {
+  //     std::cout << bond.s1 << " " << bond.s2 << "\t";
+  //     std::cout << static_cast<int>(sim_lattice.spins[bond.s1]) << " "
+  //               << static_cast<int>(sim_lattice.spins[bond.s2]) << "\n";
+  //   }
   // prng_state<4> s;
   // auto attempt = xorshift128(s);
 

@@ -1,0 +1,3 @@
+[submodule "SmallPRNG"]
+	path = SmallPRNG
+	url = https://github.com/DKenefake/SmallPRNG
