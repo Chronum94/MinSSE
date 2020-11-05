@@ -19,7 +19,7 @@
 template <class IntegerType, class FloatType, class LatticeType, class PrngType>
 struct Simulation {
   Simulation(SimulationInput<IntegerType, FloatType> in, LatticeType lat,
-             PrngType _prng) {
+             PrngType &_prng) {
     sim_input = in;
     lattice = lat;
     prng = _prng;
@@ -40,8 +40,8 @@ struct Simulation {
   LatticeType lattice;
 
   PrngType prng;
-  IntegerType expansion_cutoff;
-  IntegerType current_opcount;
+  uint32_t expansion_cutoff;
+  uint32_t current_opcount;
   FloatType aprob;
   FloatType dprob;
 
@@ -53,7 +53,7 @@ struct Simulation {
   std::vector<IntegerType> vertexlist;
 
   void diagonal_update() {
-    std::cout << "Diagonal update...\n";
+    // std::cout << "Diagonal update...\n";
 
     for (uint32_t op_index = 0; op_index < expansion_cutoff; ++op_index) {
       auto bond = static_cast<IntegerType>(prng.randf() * lattice.nbonds);
@@ -89,7 +89,7 @@ struct Simulation {
     // std::fill(vertexlist.begin(), vertexlist.end(), -1);
     std::fill(first_spinop.begin(), first_spinop.end(), -1);
     std::fill(last_spinop.begin(), last_spinop.end(), -1);
-    std::cout << "Linking vertices...\n";
+    // std::cout << "Linking vertices...\n";
 
     for (int v0 = 0; v0 < 4 * expansion_cutoff; v0 += 4) {
       auto op_index = v0 >> 2;
@@ -137,17 +137,17 @@ struct Simulation {
       }
     }
 
-    for (int v0 = 0; v0 < 4 * expansion_cutoff; v0 += 4) {
-      std::cout << v0 / 4 << '\t';
-      std::cout << opstring[v0 / 4].optype << '\t';
-      std::cout << vertexlist[v0 + 0] << '\t' << 
-      vertexlist[v0 + 1] << '\t' << vertexlist[v0 + 2] << '\t' << vertexlist[v0 + 3] << '\n';
-    }
+    // for (int v0 = 0; v0 < 4 * expansion_cutoff; v0 += 4) {
+    //   std::cout << v0 / 4 << '\t';
+    //   std::cout << opstring[v0 / 4].optype << '\t';
+    //   std::cout << vertexlist[v0 + 0] << '\t' << 
+    //   vertexlist[v0 + 1] << '\t' << vertexlist[v0 + 2] << '\t' << vertexlist[v0 + 3] << '\n';
+    // }
 
   }
 
   void loop_update() {
-    std::cout << "Loop update...\n";
+    // std::cout << "Loop update...\n";
     for (auto v0 = 0; v0 < 4 * expansion_cutoff; v0 += 4) {
       if (vertexlist[v0] < 0) {
         continue;
@@ -155,15 +155,15 @@ struct Simulation {
 
       auto v1 = v0;
       if (prng.randf() < 0.5) {
-        std::cout << "  Flipping loop...\n";
+        // std::cout << "  Flipping loop...\n";
         flip_loop(v0, v1);
       } else {
-        std::cout << "  Visiting loop...\n";
+        // std::cout << "  Visiting loop...\n";
         visit_loop(v0, v1);
       }
     }
 
-    std::cout << "  Flipping unoperated spins...\n";
+    // std::cout << "  Flipping unoperated spins...\n";
     for (auto i = 0; i < lattice.active_sites; i += 1) {
       auto first_op = first_spinop[i];
       if (first_op != -1) {
@@ -180,13 +180,6 @@ struct Simulation {
 
   _INLINE void flip_loop(IntegerType v0, IntegerType v1) {
     do {
-      // if (opstring[v1 >> 2].optype == DIAGONAL) {
-      //   opstring[v1 >> 2].optype = OFF_DIAGONAL;
-      // } else {
-      //   opstring[v1 >> 2].optype = DIAGONAL;
-      // }
-
-      // std::cout << vertexlist.length() << '\n';
       // std::cout << v0 << "  " << v1 << "\t vert at start\n" ;
       // std::cout << v0 / 4 << "  " << v1 / 4 << "\t op_index at start\n" ;
       assert(v0 >= 0);
@@ -213,7 +206,7 @@ struct Simulation {
       v1 = vertexlist[v2];
       vertexlist[v2] = -1;
       // std::cout << v0 << "  " << v1 << "\t vert at end\n" ;
-      // std::cout << v0 / 4 << "  " << v1 / 4 << "\t op_index at end\n" ;
+      //std::cout << v0 / 4 << "  " << v1 / 4 << "\t op_index at end\n" ;
     } while (v1 != v0);
   }
 
@@ -223,12 +216,14 @@ struct Simulation {
   }
 
   void run() {
-    std::cout << "Running..." << std::endl;
+    // std::cout << "Running..." << std::endl;
     for (auto i = 0; i < sim_input.nbins; i++) {
       std::cout << i << std::endl;
-      diagonal_update();
-      link_vertices();
-      loop_update();
+      for (auto j = 0; j < sim_input.msteps; j ++) {
+        diagonal_update();
+        link_vertices();
+        loop_update();
+      }
     }
   }
 };
