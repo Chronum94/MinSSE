@@ -1,40 +1,22 @@
-#include <array>
-#include <fstream>
+#include "SimulationInput.hpp"
+
 #include <iostream>
-#include <map>
-#include <sstream>
 #include <string>
+#include <sstream>
 
-template <class StringType> Simulation readinput(StringType filename) {
-  std::ifstream inputfile(filename);
-  std::string line;
-  unsigned int num_lines = 0;
-  while (std::getline(inputfile, line)) {
-    if (line.length() == 0) {
-      continue;
-    }
-    std::cout << line << '\n';
-    auto linestream = std::stringstream{line};
-    std::string current_token;
-    switch
-      num_lines
+auto initialize_from_console(int arg_count, char *arg_array[]) {
+  uint16_t lx = std::stoi(arg_array[1]);
+  uint16_t ly = std::stoi(arg_array[2]);
+  float beta = std::stof(arg_array[3]);
+  float dilution = std::stof(arg_array[4]);
+  unsigned int nbins = std::stof(arg_array[5]);
+  unsigned int msteps = std::stof(arg_array[6]);
+  unsigned int isteps = std::stof(arg_array[7]);
 
-          ++ num_lines;
-  }
-  std::cout << num_lines;
-  if (num_lines != 7) {
-    std::cout << "Invalid input file! Input files need 7 valid lines.\n";
+  SimulationInput<int, float> sim_input{lx, ly, beta, dilution};
+  sim_input.nbins = nbins;
+  sim_input.msteps = msteps;
+  sim_input.isteps = isteps;
 
-    std::cout << "nx ny nz # 3 integers; lattice size along each dimension.\n";
-    std::cout << "beta # Float/double; dimensionless inverse temperature in "
-                 "units of J.\n";
-    std::cout << "nbins # Positive integer for the binning when calculating "
-                 "expectation values.\n";
-    std::cout << "isteps # Positive integer for the ???.\n";
-    std::cout << "seed # Positive integer, seed for the pseudorandom number "
-                 "generator.\n";
-    throw;
-  }
-
-  return Simulation();
+  return sim_input;
 }
