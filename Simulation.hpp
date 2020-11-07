@@ -62,7 +62,7 @@ struct Simulation {
         if (lattice.spins[lattice.bondsites[bond_index].s1] !=
             lattice.spins[lattice.bondsites[bond_index].s2]) {
 
-          std::cout << expansion_cutoff << "\t" << current_opcount << "\t" << (expansion_cutoff - current_opcount) << "\t" << aprob << "\n";
+          // std::cout << (expansion_cutoff - current_opcount) / aprob << "\n";
           if (prng.randf() * (expansion_cutoff - current_opcount) <= aprob) {
             opstring[op_index].optype = DIAGONAL;
             opstring[op_index].opbond = bond_index;
@@ -72,7 +72,7 @@ struct Simulation {
       }
 
       else if (opstring[op_index].optype == DIAGONAL) {
-        if (prng.randf() * aprob <= (expansion_cutoff - current_opcount + 1)) {
+        if (prng.randf() <= dprob * (expansion_cutoff - current_opcount + 1)) {
           opstring[op_index].optype = IDENTITY;
           current_opcount -= 1;
         }
@@ -124,7 +124,7 @@ struct Simulation {
         // vertexlist[v0 + 1] = -1;
         // vertexlist[v0 + 2] = -1;
         // vertexlist[v0 + 3] = -1;
-        std::fill(vertexlist + v0, vertexlist + v0 + 4, -1);
+        std::fill(vertexlist.begin() + v0, vertexlist.begin() + v0 + 4, -1);
       }
     }
 
@@ -168,14 +168,14 @@ struct Simulation {
 
   void adjust_expansion_cutoff(uint32_t i) {
 
-    if (current_opcount < current_max_opcount) {
+    auto new_cutoff = static_cast<uint32_t>(4.0/3.0 * current_opcount);
+    if (new_cutoff < expansion_cutoff) {
       return;
     }
 
     else {
-      current_max_opcount = current_opcount;
-      std::cout << i << "\t" << expansion_cutoff << "\n";
-      expansion_cutoff = static_cast<uint32_t>(4.0/3.0 * current_opcount);
+      expansion_cutoff = new_cutoff;
+      // std::cout << i << "\t" << expansion_cutoff << "\n";
       opstring.resize(expansion_cutoff, Op{IDENTITY, 0});
 
       vertexlist.resize(4 * expansion_cutoff, -1);
