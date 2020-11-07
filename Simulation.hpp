@@ -24,11 +24,16 @@ struct Simulation {
     lattice = lat;
     prng = _prng;
 
-    expansion_cutoff = sim_input.max_sites;
+    auto nbeta = lattice.active_sites * sim_input.beta;
+    expansion_cutoff =  nbeta > 4? nbeta : 4;
     current_opcount = 0;
     current_max_opcount = 0;
     aprob = 0.5 * lattice.nbonds * sim_input.beta;
     dprob = 1.0 / aprob;
+
+    ususc = 0.0;
+    energy1 = 0.0;
+    specific_heat = 0.0;
 
     opstring.resize(expansion_cutoff, Op{IDENTITY, 0});
 
@@ -46,6 +51,10 @@ struct Simulation {
   uint32_t current_max_opcount;
   FloatType aprob;
   FloatType dprob;
+
+  FloatType ususc;
+  FloatType energy1;
+  FloatType specific_heat;
 
   std::vector<Op> opstring;
 
@@ -72,7 +81,7 @@ struct Simulation {
       }
 
       else if (opstring[op_index].optype == DIAGONAL) {
-        if (prng.randf() <= dprob * (expansion_cutoff - current_opcount + 1)) {
+        if (aprob * prng.randf()<= (expansion_cutoff - current_opcount + 1)) {
           opstring[op_index].optype = IDENTITY;
           current_opcount -= 1;
         }
@@ -182,6 +191,32 @@ struct Simulation {
     }
   }
 
+  void measure() {
+    FloatType temp = static_cast<FloatType>(std::accumulate(lattice.spins.begin(), lattice.spins.end(), 0));
+    ususc += temp * temp / 4.0;
+
+    energy1 += static_cast<FloatType>(current_opcount);
+  }
+
+  void write_results(std::ofstream &outfile, unsigned int bin_number) {
+    ususc /= sim_input.msteps;
+    ususc*= sim_input.beta / lattice.active_sites;
+
+    energy1 /= sim_input.msteps;
+    energy1 = - energy1 / (sim_input.beta * lattice.active_sites) + (0.25 * lattice.nbonds) / lattice.active_sites;
+
+
+    outfile.width(10);
+    outfile.precision(7);
+    outfile << std::fixed << bin_number << "\t" << ususc << "\t" << energy1 << "\n";
+
+    if (bin_number % 10 == 0) {
+      outfile.flush();
+    }
+
+    ususc = 0.0;
+    energy1 = 0.0;
+  }
   _INLINE void flip_loop(IntegerType v0, IntegerType v1) {
     do {
       assert(v0 >= 0);
@@ -224,14 +259,24 @@ struct Simulation {
 
     std::cout << expansion_cutoff << "\n";
 
+    std::ofstream results("res.dat", std::ofstream::out);
+    results.width(10);
+    results.precision(7);
+    
+    results << "Bin\t" << "Uni. Susc.\t" << "Tot. en.\n";
+
     for (auto i = 0; i < sim_input.nbins; i++) {
       // std::cout << i << std::endl;
       for (auto j = 0; j < sim_input.msteps; j++) {
         diagonal_update();
         link_vertices();
         loop_update();
+        measure();
         // std::cout << current_opcount << "\n";
       }
+      write_results(results, i);
     }
+
+    results.close();
   }
 };
