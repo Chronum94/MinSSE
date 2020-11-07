@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -33,7 +34,7 @@ template <class IntegerType, class FloatType> struct Lattice {
       spin_mask[i] = is_site_occupied;
       if (is_site_occupied) {
         masked_spin_indices[i] = active_sites;
-        std::cout << i << " " << active_sites << std::endl;
+        // std::cout << i << " " << active_sites << std::endl;
         active_sites += 1;
       }
     }
@@ -59,15 +60,15 @@ template <class IntegerType, class FloatType> struct Lattice {
         // increase bond counter.
         if (spin_mask[next_spin_x]) {
           bondsites.push_back(
-              Bond<IntegerType>{masked_spin_indices[current_spin],
-                                masked_spin_indices[next_spin_x]});
+              Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
+                   static_cast<uint16_t>(masked_spin_indices[next_spin_x])});
           bond_counter += 1;
         }
 
         if (spin_mask[next_spin_y]) {
           bondsites.push_back(
-              Bond<IntegerType>{masked_spin_indices[current_spin],
-                                masked_spin_indices[next_spin_y]});
+              Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
+                   static_cast<uint16_t>(masked_spin_indices[next_spin_y])});
           bond_counter += 1;
         }
 
@@ -91,11 +92,11 @@ template <class IntegerType, class FloatType> struct Lattice {
   }
 
   bool initialized;
-  IntegerType active_sites;
-  IntegerType nbonds;
+  uint16_t active_sites;
+  uint16_t nbonds;
   SimulationInput<IntegerType, FloatType> sim_input;
 
   std::vector<bool> spin_mask;
   std::vector<int8_t> spins;
-  std::vector<Bond<IntegerType>> bondsites;
+  std::vector<Bond> bondsites;
 };
