@@ -18,5 +18,9 @@ auto initialize_from_console(int arg_count, char *arg_array[]) {
   sim_input.msteps = msteps;
   sim_input.isteps = isteps;
 
+  if (arg_count > 8) {
+    sim_input.resultsfile = arg_array[8];
+  }
+
   return sim_input;
 }

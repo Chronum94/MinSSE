@@ -1,6 +1,7 @@
 #pragma once
+#include <cstdint>
 
-template <class IntegerType> struct Bond {
-  IntegerType s1;
-  IntegerType s2;
+struct Bond {
+  uint16_t s1;
+  uint16_t s2;
 };

@@ -71,7 +71,6 @@ struct Simulation {
         if (lattice.spins[lattice.bondsites[bond_index].s1] !=
             lattice.spins[lattice.bondsites[bond_index].s2]) {
 
-          // std::cout << (expansion_cutoff - current_opcount) / aprob << "\n";
           if (prng.randf() * (expansion_cutoff - current_opcount) <= aprob) {
             opstring[op_index].optype = DIAGONAL;
             opstring[op_index].opbond = bond_index;
@@ -129,10 +128,6 @@ struct Simulation {
       }
 
       else {
-        // vertexlist[v0] = -1;
-        // vertexlist[v0 + 1] = -1;
-        // vertexlist[v0 + 2] = -1;
-        // vertexlist[v0 + 3] = -1;
         std::fill(vertexlist.begin() + v0, vertexlist.begin() + v0 + 4, -1);
       }
     }
@@ -259,20 +254,18 @@ struct Simulation {
 
     std::cout << expansion_cutoff << "\n";
 
-    std::ofstream results("res.dat", std::ofstream::out);
+    std::ofstream results(sim_input.resultsfile, std::ofstream::out);
     results.width(10);
     results.precision(7);
     
     results << "Bin\t" << "Uni. Susc.\t" << "Tot. en.\n";
 
     for (auto i = 0; i < sim_input.nbins; i++) {
-      // std::cout << i << std::endl;
       for (auto j = 0; j < sim_input.msteps; j++) {
         diagonal_update();
         link_vertices();
         loop_update();
         measure();
-        // std::cout << current_opcount << "\n";
       }
       write_results(results, i);
     }
