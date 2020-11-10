@@ -14,5 +14,6 @@ The above line runs a 4x4x4 lattice at inverse temperature (beta) of 2, 0.0 dilu
 The run signature is:
 
 `./a.out nx ny nz beta dilution nbins msteps isteps outfilename`
+# Dependencies:
 
-This project uses [`SmallPRNG`](https://github.com/DKenefake/SmallPRNG) as its PRNG source.
+1. This project uses [`SmallPRNG`](https://github.com/DKenefake/SmallPRNG) as fast and reliable PRNG source.
