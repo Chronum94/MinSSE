@@ -1,12 +1,13 @@
 #pragma once
 
+#include <algorithm>
+#include <numeric>
+#include <cassert>
+
 #include "Bond.hpp"
 #include "Lattice.hpp"
 #include "Op.hpp"
 #include "SimulationInput.hpp"
-
-#include <algorithm>
-#include <cassert>
 
 #ifdef _MSC_VER
 #define _INLINE __forceinline
@@ -24,10 +25,9 @@ struct Simulation {
     lattice = lat;
     prng = _prng;
 
-    auto nbeta = lattice.active_sites * sim_input.beta;
+    auto nbeta = lattice.n_active_sites * sim_input.beta;
     expansion_cutoff =  nbeta > 4? nbeta : 4;
     current_opcount = 0;
-    current_max_opcount = 0;
     aprob = 0.5 * lattice.nbonds * sim_input.beta;
     dprob = 1.0 / aprob;
 
@@ -36,10 +36,8 @@ struct Simulation {
     specific_heat = 0.0;
 
     opstring.resize(expansion_cutoff, Op{IDENTITY, 0});
-
-    first_spinop.resize(lattice.active_sites, -1);
-    last_spinop.resize(lattice.active_sites, -1);
-
+    first_spinop.resize(lattice.n_active_sites, -1);
+    last_spinop.resize(lattice.n_active_sites, -1);
     vertexlist.resize(4 * expansion_cutoff, -1);
   }
   SimulationInput<IntegerType, FloatType> sim_input;
@@ -48,7 +46,6 @@ struct Simulation {
   PrngType prng;
   uint32_t expansion_cutoff;
   uint32_t current_opcount;
-  uint32_t current_max_opcount;
   FloatType aprob;
   FloatType dprob;
 
@@ -57,11 +54,11 @@ struct Simulation {
   FloatType specific_heat;
 
   std::vector<Op> opstring;
-
   std::vector<IntegerType> first_spinop;
   std::vector<IntegerType> last_spinop;
-
   std::vector<IntegerType> vertexlist;
+
+  std::vector<uint32_t> equilibriation_opcounts;
 
   void diagonal_update() {
 
@@ -132,7 +129,7 @@ struct Simulation {
       }
     }
 
-    for (auto s1 = 0; s1 < lattice.active_sites; s1++) {
+    for (auto s1 = 0; s1 < lattice.n_active_sites; s1++) {
       auto v1 = first_spinop[s1];
       if (v1 != -1) {
         auto v2 = last_spinop[s1];
@@ -156,7 +153,7 @@ struct Simulation {
       }
     }
 
-    for (auto i = 0; i < lattice.active_sites; i++) {
+    for (auto i = 0; i < lattice.n_active_sites; i++) {
       auto first_op = first_spinop[i];
       if (first_op != -1) {
         if (vertexlist[first_op] == -2) {
@@ -170,7 +167,7 @@ struct Simulation {
     }
   }
 
-  void adjust_expansion_cutoff(uint32_t i) {
+  void adjust_expansion_cutoff_linear(uint32_t i) {
 
     auto new_cutoff = static_cast<uint32_t>(4.0/3.0 * current_opcount);
     if (new_cutoff < expansion_cutoff) {
@@ -195,10 +192,10 @@ struct Simulation {
 
   void write_results(std::ofstream &outfile, unsigned int bin_number) {
     ususc /= sim_input.msteps;
-    ususc*= sim_input.beta / lattice.active_sites;
+    ususc*= sim_input.beta / lattice.n_active_sites;
 
     energy1 /= sim_input.msteps;
-    energy1 = - energy1 / (sim_input.beta * lattice.active_sites) + (0.25 * lattice.nbonds) / lattice.active_sites;
+    energy1 = - energy1 / (sim_input.beta * lattice.n_active_sites) + (0.25 * lattice.nbonds) / lattice.n_active_sites;
 
 
     outfile.width(10);
@@ -242,17 +239,17 @@ struct Simulation {
     lattice.spins[b.s2] *= -1;
   }
 
-  void run() {
+  void run(std::ofstream &outputfile) {
 
-    std::cout << expansion_cutoff << "\n";
+    outputfile << "Initial cutoff: " << expansion_cutoff << "\n";
     for (auto j = 0; j < sim_input.isteps; j++) {
       diagonal_update();
       link_vertices();
       loop_update();
-      adjust_expansion_cutoff(j);
+      adjust_expansion_cutoff_linear(j);
     }
 
-    std::cout << expansion_cutoff << "\n";
+    outputfile << "Final cutoff: " << expansion_cutoff << "\n";
 
     std::ofstream results(sim_input.resultsfile, std::ofstream::out);
     results.width(10);
