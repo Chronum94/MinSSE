@@ -2,7 +2,7 @@
 
 Minimal compilation:
 
-`clang++ sse_driver.cpp --std=c++17 -Ofast -march=native -mtune=native -g -fno-unroll-loops -malign-double -DNDEBUG DRANDOM_GENERATOR` where
+`clang++ sse_driver.cpp --std=c++17 -Ofast -march=native -mtune=native -g -fno-unroll-loops -malign-double -DNDEBUG -DRANDOM_GENERATOR` where
 `RANDOM_GENERATOR` can be `XORSHIFT128`, `XORSHIFT32` (don't really recommend this...), `SQUARES`, `AES4`, or `LCG`.
 
 Minimal run with:
