@@ -6,7 +6,6 @@
 #include <utility>
 #include <vector>
 
-
 #include "Bond.hpp"
 #include "SimulationInput.hpp"
 
@@ -41,7 +40,7 @@ template <class IntegerType, class FloatType> struct Lattice {
     }
 
     std::ofstream spinmask_file("spinmask.out");
-    for (auto e: spin_mask) {
+    for (auto e : spin_mask) {
       spinmask_file << static_cast<uint32_t>(e) << "\n";
     }
     spinmask_file.close();
@@ -49,7 +48,7 @@ template <class IntegerType, class FloatType> struct Lattice {
     IntegerType bond_counter = 0;
 
     IntegerType k = 0;
-    while(k < nz) {
+    while (k < nz) {
       IntegerType j = 0;
 
       while (j < ny) {
@@ -73,23 +72,23 @@ template <class IntegerType, class FloatType> struct Lattice {
           if (spin_mask[next_spin_x]) {
             bondsites.push_back(
                 Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
-                    static_cast<uint16_t>(masked_spin_indices[next_spin_x])});
+                     static_cast<uint16_t>(masked_spin_indices[next_spin_x])});
             bond_counter += 1;
           }
 
           if (spin_mask[next_spin_y]) {
             bondsites.push_back(
                 Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
-                    static_cast<uint16_t>(masked_spin_indices[next_spin_y])});
+                     static_cast<uint16_t>(masked_spin_indices[next_spin_y])});
             bond_counter += 1;
           }
 
           // Making a z=1 lattice a 2D lattice.
           if (nx > 1) {
             if (spin_mask[next_spin_z]) {
-              bondsites.push_back(
-                  Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
-                      static_cast<uint16_t>(masked_spin_indices[next_spin_z])});
+              bondsites.push_back(Bond{
+                  static_cast<uint16_t>(masked_spin_indices[current_spin]),
+                  static_cast<uint16_t>(masked_spin_indices[next_spin_z])});
               bond_counter += 1;
             }
           }
@@ -100,13 +99,13 @@ template <class IntegerType, class FloatType> struct Lattice {
         j += 1;
       }
 
-    k += 1;
+      k += 1;
     }
 
     nbonds = bond_counter;
 
     std::ofstream bonds_file("bonds.out");
-    for (auto e: bondsites) {
+    for (auto e : bondsites) {
       bonds_file << e.s1 << "," << e.s2 << "\n";
     }
     bonds_file.close();
@@ -124,7 +123,8 @@ template <class IntegerType, class FloatType> struct Lattice {
 
   template <class PrngType> void make_lattice(PrngType &prng) {
 
-    uint16_t intended_n_activesites = static_cast<uint16_t>(sim_input.n_active_sites);
+    uint16_t intended_n_activesites =
+        static_cast<uint16_t>(sim_input.n_active_sites);
 
     std::vector<FloatType> site_floatmask(sim_input.max_sites);
     for (auto i = 0; i < sim_input.max_sites; i++) {
@@ -133,19 +133,27 @@ template <class IntegerType, class FloatType> struct Lattice {
     float lower_bound_frac = 0.0;
     float upper_bound_frac = 1.0;
     float mid_point;
-    
 
     IntegerType iterations = 0;
 
+    /***
+     * This do-while loop generates a lattice with _exactly_ the number of sites
+     * that is the closest to the intended dilution fraction and less than it.
+     * This makes the number of spins for a given dilution deterministic,
+     * leaving only the random arrangement as the 'realization variable'.
+     *
+     * The methodology was suggested/patiently explained to me by Dustin
+     * Kenefake.
+     * ***/
     do {
       mid_point = (upper_bound_frac + lower_bound_frac) / 2.0;
       n_active_sites = 0;
 
-      std::for_each(site_floatmask.begin(), site_floatmask.end(),[&](float r){n_active_sites += r < mid_point? 1: 0;});
+      std::for_each(site_floatmask.begin(), site_floatmask.end(),
+                    [&](float r) { n_active_sites += r < mid_point ? 1 : 0; });
       if (n_active_sites > intended_n_activesites) {
         upper_bound_frac = mid_point;
-      }
-      else if (n_active_sites < intended_n_activesites) {
+      } else if (n_active_sites < intended_n_activesites) {
         lower_bound_frac = mid_point;
       } else {
         break;
@@ -154,9 +162,9 @@ template <class IntegerType, class FloatType> struct Lattice {
       iterations += 1;
     } while (n_active_sites != intended_n_activesites);
 
-    std::transform(site_floatmask.begin(), site_floatmask.end(), spin_mask.begin(),
-    [&](float r){return r < mid_point? 1: 0;});
-
+    std::transform(site_floatmask.begin(), site_floatmask.end(),
+                   spin_mask.begin(),
+                   [&](float r) { return r < mid_point ? 1 : 0; });
   }
 
   bool initialized;
