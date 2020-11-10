@@ -1,8 +1,8 @@
 #include "SimulationInput.hpp"
 
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <string>
 
 auto initialize_from_console(int arg_count, char *arg_array[]) {
   uint16_t lx = std::stoi(arg_array[1]);

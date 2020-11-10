@@ -1,8 +1,8 @@
 #pragma once
 
 #include <algorithm>
-#include <numeric>
 #include <cassert>
+#include <numeric>
 
 #include "Bond.hpp"
 #include "Lattice.hpp"
@@ -26,7 +26,7 @@ struct Simulation {
     prng = _prng;
 
     auto nbeta = lattice.n_active_sites * sim_input.beta;
-    expansion_cutoff =  nbeta > 4? nbeta : 4;
+    expansion_cutoff = nbeta > 4 ? nbeta : 4;
     current_opcount = 0;
     aprob = 0.5 * lattice.nbonds * sim_input.beta;
     dprob = 1.0 / aprob;
@@ -64,7 +64,8 @@ struct Simulation {
 
     for (uint32_t op_index = 0; op_index < expansion_cutoff; ++op_index) {
       if (opstring[op_index].optype == IDENTITY) {
-        auto bond_index = static_cast<IntegerType>(prng.randf() * lattice.nbonds);
+        auto bond_index =
+            static_cast<IntegerType>(prng.randf() * lattice.nbonds);
         if (lattice.spins[lattice.bondsites[bond_index].s1] !=
             lattice.spins[lattice.bondsites[bond_index].s2]) {
 
@@ -77,7 +78,7 @@ struct Simulation {
       }
 
       else if (opstring[op_index].optype == DIAGONAL) {
-        if (aprob * prng.randf()<= (expansion_cutoff - current_opcount + 1)) {
+        if (aprob * prng.randf() <= (expansion_cutoff - current_opcount + 1)) {
           opstring[op_index].optype = IDENTITY;
           current_opcount -= 1;
         }
@@ -169,7 +170,7 @@ struct Simulation {
 
   void adjust_expansion_cutoff_linear(uint32_t i) {
 
-    auto new_cutoff = static_cast<uint32_t>(4.0/3.0 * current_opcount);
+    auto new_cutoff = static_cast<uint32_t>(4.0 / 3.0 * current_opcount);
     if (new_cutoff < expansion_cutoff) {
       return;
     }
@@ -184,7 +185,8 @@ struct Simulation {
   }
 
   void measure() {
-    FloatType temp = static_cast<FloatType>(std::accumulate(lattice.spins.begin(), lattice.spins.end(), 0));
+    FloatType temp = static_cast<FloatType>(
+        std::accumulate(lattice.spins.begin(), lattice.spins.end(), 0));
     ususc += temp * temp / 4.0;
 
     energy1 += static_cast<FloatType>(current_opcount);
@@ -192,15 +194,16 @@ struct Simulation {
 
   void write_results(std::ofstream &outfile, unsigned int bin_number) {
     ususc /= sim_input.msteps;
-    ususc*= sim_input.beta / lattice.n_active_sites;
+    ususc *= sim_input.beta / lattice.n_active_sites;
 
     energy1 /= sim_input.msteps;
-    energy1 = - energy1 / (sim_input.beta * lattice.n_active_sites) + (0.25 * lattice.nbonds) / lattice.n_active_sites;
-
+    energy1 = -energy1 / (sim_input.beta * lattice.n_active_sites) +
+              (0.25 * lattice.nbonds) / lattice.n_active_sites;
 
     outfile.width(10);
     outfile.precision(7);
-    outfile << std::fixed << bin_number << "\t" << ususc << "\t" << energy1 << "\n";
+    outfile << std::fixed << bin_number << "\t" << ususc << "\t" << energy1
+            << "\n";
 
     if (bin_number % 10 == 0) {
       outfile.flush();
@@ -254,8 +257,10 @@ struct Simulation {
     std::ofstream results(sim_input.resultsfile, std::ofstream::out);
     results.width(10);
     results.precision(7);
-    
-    results << "Bin\t" << "Uni. Susc.\t" << "Tot. en.\n";
+
+    results << "Bin\t"
+            << "Uni. Susc.\t"
+            << "Tot. en.\n";
 
     for (auto i = 0; i < sim_input.nbins; i++) {
       for (auto j = 0; j < sim_input.msteps; j++) {

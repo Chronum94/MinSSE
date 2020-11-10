@@ -10,18 +10,24 @@
 #include "SmallPRNG/prng.h"
 
 
-#ifdef XORSHIFT128
-#define PRNGTYPE smallprng::xor128
+#if XORSHIFT128
+using PRNGTYPE = smallprng::xor128;
+constexpr auto PRNG_DESC = "XORSHIFT128";
 #elif XORSHIFT32
-#define PRNGTYPE smallprng::xor32
+using PRNGTYPE = smallprng::xor32;
+constexpr auto PRNG_DESC = "XORSHIFT32";
 #elif SQUARES
-#define PRNGTYPE smallprng::improved_squares
+using PRNGTYPE = smallprng::improved_squares;
+constexpr auto PRNG_DESC = "IMPROVED_SQUARES";
 #elif AES4
-#define PRNGTYPE smallprng::aes_4
+using PRNGTYPE = smallprng::aes_4;
+constexpr auto  PRNG_DESC = "AES(4)";
 #elif LCG
-#define PRNGTYPE smallprng::knuth_lcg
+using PRNGTYPE = smallprng::knuth_lcg;
+constexpr auto  PRNG_DESC = "KNUTH_LCG";
 #else
-#define PRNGTYPE smallprng::improved_squares
+using PRNGTYPE = smallprng::improved_squares;
+constexpr auto  PRNG_DESC = "IMPROVED_SQUARES";
 #endif
 
 
@@ -33,7 +39,9 @@ int main(int argc, char *argv[]) {
 
     std::ofstream outfile("out.log");
     outfile << sim_input << std::endl;
+    outfile << "PRNG: " << PRNG_DESC << "\n";
     Lattice<int, float> sim_lattice(sim_input);
+
 
     // prng<4, uint32_t, xorshift128> myprng;
     // prng<1, uint32_t, xorshift32> myprng;
