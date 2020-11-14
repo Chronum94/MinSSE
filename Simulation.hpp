@@ -210,8 +210,7 @@ struct Simulation {
       if (op_index % intrasweep_measurement_interval == 0) {
         local_susc_measurement_count += 1;
         for (auto i = 0; i < lattice.n_active_sites; i++) {
-          // Div by 4.0 here to account for 2 factors of 1/2 on each term.
-          local_susceptibilities[i] += spins_copy[i] * sum_of_spins / 4.0;
+          local_susceptibilities[i] += spins_copy[i] * sum_of_spins;
         }
       }
     }
@@ -239,10 +238,7 @@ struct Simulation {
         // Take the mean of the local susceptibilities.
     for (auto e: local_susceptibilities) {
       e /= local_susc_measurement_count;
-    }
-
-    for (auto e: local_susceptibilities) {
-      auto f = e * sim_input.beta / local_susc_measurement_count;
+      auto f = e * sim_input.beta / (local_susc_measurement_count * 4.0);
       locsuscfile << f << " ";
     }
     locsuscfile << "\n";
