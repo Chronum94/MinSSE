@@ -56,6 +56,7 @@ struct Simulation {
   std::vector<FloatType> local_susceptibilities;
   std::vector<IntegerType> spins_copy;
   IntegerType intrasweep_measurement_interval;
+  IntegerType local_susc_measurement_count = 0;
 
   std::vector<Op> opstring;
   std::vector<IntegerType> first_spinop;
@@ -198,7 +199,6 @@ struct Simulation {
 
     // We would like to not flip the original spins... I think.
     std::copy(lattice.spins.begin(), lattice.spins.end(), spins_copy.begin());
-    auto local_susc_measurement_count = 0;
     // Sum over the local susceptibility at each step in the MC sweep.
     for(auto op_index = 0; op_index < expansion_cutoff; op_index++) {
       if (opstring[op_index].optype == OFF_DIAGONAL) {
@@ -216,10 +216,6 @@ struct Simulation {
       }
     }
 
-    // Take the mean of the local susceptibilities.
-    for (auto e: local_susceptibilities) {
-      e /= local_susc_measurement_count;
-    }
   }
 
   void finalize_and_write_results(std::ofstream &outfile, std::ofstream &locsuscfile, unsigned int bin_number) {
@@ -239,8 +235,14 @@ struct Simulation {
 
     locsuscfile.width(8);
     locsuscfile.precision(6);
+
+        // Take the mean of the local susceptibilities.
     for (auto e: local_susceptibilities) {
-      auto f = e * sim_input.beta / (sim_input.msteps * lattice.n_active_sites);
+      e /= local_susc_measurement_count;
+    }
+
+    for (auto e: local_susceptibilities) {
+      auto f = e * sim_input.beta / local_susc_measurement_count;
       locsuscfile << f << " ";
     }
     locsuscfile << "\n";
@@ -251,6 +253,7 @@ struct Simulation {
 
     ususc = 0.0;
     energy1 = 0.0;
+    local_susc_measurement_count = 0;
     std::fill(local_susceptibilities.begin(), local_susceptibilities.end(), 0.0);
   }
   _INLINE void flip_loop(IntegerType v0, IntegerType v1) {
@@ -293,8 +296,10 @@ struct Simulation {
       adjust_expansion_cutoff_linear(j);
     }
 
-    intrasweep_measurement_interval = 5;
+    FloatType interval = lattice.n_active_sites / 4.0;
+    intrasweep_measurement_interval =  interval > 1 ? static_cast<IntegerType>(interval) : 1;
     outputfile << "Final cutoff: " << expansion_cutoff << "\n";
+    outputfile << "Locsusc m.interval: " << intrasweep_measurement_interval << "\n";
 
     std::ofstream results_outstream("results.dat", std::ofstream::out);
     std::ofstream local_susc_outstream("locsusc.dat", std::ofstream::out);
