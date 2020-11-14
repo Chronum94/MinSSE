@@ -31,6 +31,9 @@ template <class IntegerType, class FloatType> struct Lattice {
 
     make_lattice(prng);
 
+    nbonds_at_spin.resize(n_active_sites, 0);
+    
+
     IntegerType active_site = 0;
     for (auto i = 0; i < sim_input.max_sites; i++) {
       if (spin_mask[i]) {
@@ -69,26 +72,36 @@ template <class IntegerType, class FloatType> struct Lattice {
 
           // If the next spin horizontally exists, add it to the bond,
           // increase bond counter.
+
+          auto s1 = static_cast<uint16_t>(masked_spin_indices[current_spin]);
           if (spin_mask[next_spin_x]) {
+            auto s2 = static_cast<uint16_t>(masked_spin_indices[next_spin_x]);
             bondsites.push_back(
-                Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
-                     static_cast<uint16_t>(masked_spin_indices[next_spin_x])});
+                Bond{s1, s2
+                     });
+            nbonds_at_spin[s1] += 1;
+            nbonds_at_spin[s2] += 1;
             bond_counter += 1;
           }
 
           if (spin_mask[next_spin_y]) {
+            auto s2 = static_cast<uint16_t>(masked_spin_indices[next_spin_y]);
             bondsites.push_back(
-                Bond{static_cast<uint16_t>(masked_spin_indices[current_spin]),
-                     static_cast<uint16_t>(masked_spin_indices[next_spin_y])});
+                Bond{s1,
+                     s2});
+            nbonds_at_spin[s1] += 1;
+            nbonds_at_spin[s2] += 1;
             bond_counter += 1;
           }
 
           // Making a z=1 lattice a 2D lattice.
-          if (nx > 1) {
+          if (nz > 1) {
             if (spin_mask[next_spin_z]) {
+              auto s2 = static_cast<uint16_t>(masked_spin_indices[next_spin_z]);
               bondsites.push_back(Bond{
-                  static_cast<uint16_t>(masked_spin_indices[current_spin]),
-                  static_cast<uint16_t>(masked_spin_indices[next_spin_z])});
+                  s1, s2});
+              nbonds_at_spin[s1] += 1;
+              nbonds_at_spin[s2] += 1;
               bond_counter += 1;
             }
           }
@@ -104,9 +117,15 @@ template <class IntegerType, class FloatType> struct Lattice {
 
     nbonds = bond_counter;
 
+    std::ofstream nbonds_at_spin_file("spinbonds.out");
+    for (auto e : nbonds_at_spin) {
+      nbonds_at_spin_file << static_cast<uint32_t>(e) << "\n";
+    }
+    nbonds_at_spin_file.close();
+
     std::ofstream bonds_file("bonds.out");
     for (auto e : bondsites) {
-      bonds_file << e.s1 << "," << e.s2 << "\n";
+      bonds_file << e.s1 << " " << e.s2 << "\n";
     }
     bonds_file.close();
 
@@ -174,5 +193,6 @@ template <class IntegerType, class FloatType> struct Lattice {
 
   std::vector<bool> spin_mask;
   std::vector<int8_t> spins;
+  std::vector<uint8_t> nbonds_at_spin;
   std::vector<Bond> bondsites;
 };

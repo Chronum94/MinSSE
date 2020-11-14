@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     // prng<4, uint32_t, xorshift128> myprng;
     // prng<1, uint32_t, xorshift32> myprng;
     // prng<4, uint32_t, squares> myprng;
-    PRNGTYPE myprng;
+    auto myprng = PRNGTYPE(sim_input.seed);
 
     sim_lattice.initialize(myprng);
     // std::cout << sim_lattice.n_active_sites << std::endl;

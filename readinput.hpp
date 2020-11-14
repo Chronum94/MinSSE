@@ -20,7 +20,10 @@ auto initialize_from_console(int arg_count, char *arg_array[]) {
   sim_input.isteps = isteps;
 
   if (arg_count > 9) {
-    sim_input.resultsfile = arg_array[9];
+    sim_input.seed = std::stoi(arg_array[9]);
+  }
+  else {
+    sim_input.seed = 4567834567;
   }
 
   return sim_input;

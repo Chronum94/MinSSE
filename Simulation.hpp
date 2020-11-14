@@ -33,12 +33,14 @@ struct Simulation {
 
     ususc = 0.0;
     energy1 = 0.0;
-    specific_heat = 0.0;
 
     opstring.resize(expansion_cutoff, Op{IDENTITY, 0});
     first_spinop.resize(lattice.n_active_sites, -1);
     last_spinop.resize(lattice.n_active_sites, -1);
     vertexlist.resize(4 * expansion_cutoff, -1);
+
+    spins_copy.resize(lattice.n_active_sites, 0.0);
+    local_susceptibilities.resize(lattice.n_active_sites, 0.0);
   }
   SimulationInput<IntegerType, FloatType> sim_input;
   LatticeType lattice;
@@ -51,14 +53,14 @@ struct Simulation {
 
   FloatType ususc;
   FloatType energy1;
-  FloatType specific_heat;
+  std::vector<FloatType> local_susceptibilities;
+  std::vector<IntegerType> spins_copy;
+  IntegerType intrasweep_measurement_interval;
 
   std::vector<Op> opstring;
   std::vector<IntegerType> first_spinop;
   std::vector<IntegerType> last_spinop;
   std::vector<IntegerType> vertexlist;
-
-  std::vector<uint32_t> equilibriation_opcounts;
 
   void diagonal_update() {
 
@@ -185,14 +187,42 @@ struct Simulation {
   }
 
   void measure() {
-    FloatType temp = static_cast<FloatType>(
+    
+    FloatType sum_of_spins = static_cast<FloatType>(
         std::accumulate(lattice.spins.begin(), lattice.spins.end(), 0));
-    ususc += temp * temp / 4.0;
-
+    // std::cout << "\t" << temp << "\n";
+    
+    ususc += sum_of_spins * sum_of_spins / 4.0;
     energy1 += static_cast<FloatType>(current_opcount);
+
+
+    // We would like to not flip the original spins... I think.
+    std::copy(lattice.spins.begin(), lattice.spins.end(), spins_copy.begin());
+    auto local_susc_measurement_count = 0;
+    // Sum over the local susceptibility at each step in the MC sweep.
+    for(auto op_index = 0; op_index < expansion_cutoff; op_index++) {
+      if (opstring[op_index].optype == OFF_DIAGONAL) {
+        auto bond = lattice.bondsites[opstring[op_index].opbond];
+        spins_copy[bond.s1] *= -1;
+        spins_copy[bond.s2] *= -1;
+      }
+
+      if (op_index % intrasweep_measurement_interval == 0) {
+        local_susc_measurement_count += 1;
+        for (auto i = 0; i < lattice.n_active_sites; i++) {
+          // Div by 4.0 here to account for 2 factors of 1/2 on each term.
+          local_susceptibilities[i] += spins_copy[i] * sum_of_spins / 4.0;
+        }
+      }
+    }
+
+    // Take the mean of the local susceptibilities.
+    for (auto e: local_susceptibilities) {
+      e /= local_susc_measurement_count;
+    }
   }
 
-  void write_results(std::ofstream &outfile, unsigned int bin_number) {
+  void finalize_and_write_results(std::ofstream &outfile, std::ofstream &locsuscfile, unsigned int bin_number) {
     ususc /= sim_input.msteps;
     ususc *= sim_input.beta / lattice.n_active_sites;
 
@@ -200,17 +230,28 @@ struct Simulation {
     energy1 = -energy1 / (sim_input.beta * lattice.n_active_sites) +
               (0.25 * lattice.nbonds) / lattice.n_active_sites;
 
-    outfile.width(10);
+    
+
+    outfile.width(9);
     outfile.precision(7);
-    outfile << std::fixed << bin_number << "\t" << ususc << "\t" << energy1
+    outfile << std::fixed << bin_number << " " << ususc << " " << energy1
             << "\n";
 
+    locsuscfile.width(8);
+    locsuscfile.precision(6);
+    for (auto e: local_susceptibilities) {
+      auto f = e * sim_input.beta / (sim_input.msteps * lattice.n_active_sites);
+      locsuscfile << f << " ";
+    }
+    locsuscfile << "\n";
     if (bin_number % 10 == 0) {
       outfile.flush();
+      locsuscfile.flush();
     }
 
     ususc = 0.0;
     energy1 = 0.0;
+    std::fill(local_susceptibilities.begin(), local_susceptibilities.end(), 0.0);
   }
   _INLINE void flip_loop(IntegerType v0, IntegerType v1) {
     do {
@@ -252,13 +293,15 @@ struct Simulation {
       adjust_expansion_cutoff_linear(j);
     }
 
+    intrasweep_measurement_interval = 5;
     outputfile << "Final cutoff: " << expansion_cutoff << "\n";
 
-    std::ofstream results(sim_input.resultsfile, std::ofstream::out);
-    results.width(10);
-    results.precision(7);
+    std::ofstream results_outstream("results.dat", std::ofstream::out);
+    std::ofstream local_susc_outstream("locsusc.dat", std::ofstream::out);
+    results_outstream.width(10);
+    results_outstream.precision(7);
 
-    results << "Bin\t"
+    results_outstream << "Bin\t"
             << "Uni. Susc.\t"
             << "Tot. en.\n";
 
@@ -269,9 +312,9 @@ struct Simulation {
         loop_update();
         measure();
       }
-      write_results(results, i);
+      finalize_and_write_results(results_outstream, local_susc_outstream, i);
     }
 
-    results.close();
+    results_outstream.close();
   }
 };
