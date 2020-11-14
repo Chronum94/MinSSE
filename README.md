@@ -1,4 +1,4 @@
-# MinSSE: A minimal 2/3D Heisenberg lattice simulator using the stochastic series expansion.
+# MinSSE: A minimal 2/3D Heisenberg lattice simulator using the stochastic series expansion method
 
 Minimal compilation:
 
