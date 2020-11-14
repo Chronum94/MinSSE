@@ -2,10 +2,26 @@
 
 Minimal compilation:
 
-`clang++ sse_driver.cpp --std=c++17 -Ofast -march=native -mtune=native -g -fno-unroll-loops -malign-double -DNDEBUG -DRANDOM_GENERATOR` where
+`clang++ sse_driver.cpp --std=c++17 -Ofast -DNDEBUG -DRANDOM_GENERATOR` where
 `RANDOM_GENERATOR` can be `XORSHIFT128`, `XORSHIFT32` (don't really recommend this...), `SQUARES`, `AES4`, or `LCG`. You can also replace `clang++` with `g++` and it should compile.
 
-Minimal run with:
+Not-so-minimal compilation:
+
+`clang++ sse_driver.cpp --std=c++17 -Ofast -march=native -mtune=native -g -fno-unroll-loops -malign-double -DNDEBUG -DRANDOM_GENERATOR`
+
+The general run signature is:
+
+`./a.out nx ny nz beta dilution nbins msteps isteps int32_seed`
+
+`nx`, `ny`, `nz`: Lattice sizes along each direction. Periodic boundaries are implemented in all directions. If `nz=1`, you have a 2D lattice.\
+`beta`: Inverse temperature.\
+`dilution`: Percentage of vacancies in lattice.\
+`nbins`: Number of bins in which to bin the run data.\
+`msteps`: Number of Monte-Carlo sweeps per bin. A measurement is done after each sweep.\
+`isteps`: Number of equilibriation sweeps. This is to bring the number of operators to an equilibriated number.\
+`int32_seed`: An int32 number, which SmallPRNG reads in, mixes a bit, and use _that_ as a seed. It's still all deterministic.
+
+Minimal run with (assuming you're currently in the directory with the `a.out` executable):
 
 ```
 mkdir TestDir
@@ -24,9 +40,6 @@ The above run will output a few files:
 `locsusc.dat`: The local susceptibility for each spin in the lattice. Each row is a bin.\
 `results.dat`: The uniform susceptibility and total energy of the lattice for each bin.
 
-The general run signature is:
-
-`./a.out nx ny nz beta dilution nbins msteps isteps int32_seed`
 # Dependencies:
 
 1. This project uses [`SmallPRNG`](https://github.com/DKenefake/SmallPRNG) as fast and reliable PRNG source.
