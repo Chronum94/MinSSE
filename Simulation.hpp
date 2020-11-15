@@ -235,10 +235,11 @@ struct Simulation {
     locsuscfile.width(8);
     locsuscfile.precision(6);
 
-        // Take the mean of the local susceptibilities.
+
+
     for (auto e: local_susceptibilities) {
       e /= local_susc_measurement_count;
-      auto f = e * sim_input.beta / 4.0;
+      auto f = e * sim_input.beta / (4.0);
       locsuscfile << f << " ";
     }
     locsuscfile << "\n";
