@@ -58,6 +58,21 @@ struct Simulation {
   IntegerType intrasweep_measurement_interval;
   IntegerType local_susc_measurement_count = 0;
 
+  uint64_t coin_pool = 0;
+  uint32_t coin_bits_left = 0;
+
+  // Batched coin flips: one PRNG draw serves 64 fair coin decisions.
+  _INLINE bool coin_flip() {
+    if (coin_bits_left == 0) {
+      coin_pool = prng.rand_64();
+      coin_bits_left = 64;
+    }
+    bool heads = coin_pool & 1;
+    coin_pool >>= 1;
+    coin_bits_left -= 1;
+    return heads;
+  }
+
   std::vector<Op> opstring;
   std::vector<IntegerType> first_spinop;
   std::vector<IntegerType> last_spinop;
@@ -74,7 +89,9 @@ struct Simulation {
       IntegerType bond_index;
 
       if (opstring[op_index].optype == IDENTITY) {
-        bond_index = static_cast<IntegerType>(prng.randf() * lattice.nbonds);
+        // Lemire-style bounded pick: avoids float multiply + float->int cast.
+        bond_index = static_cast<IntegerType>(
+            (static_cast<uint64_t>(prng.rand_32()) * lattice.nbonds) >> 32);
         auto bond = lattice.bondsites[bond_index];
         if (lattice.spins[bond.s1] != lattice.spins[bond.s2] &&
             prng.randf() * (expansion_cutoff - current_opcount) <= aprob) {
@@ -145,7 +162,7 @@ struct Simulation {
       }
 
       auto v1 = v0;
-      if (prng.randf() < 0.5) {
+      if (coin_flip()) {
         flip_loop(v0, v1);
       } else {
         visit_loop(v0, v1);
@@ -159,7 +176,7 @@ struct Simulation {
           lattice.spins[i] *= -1;
         }
       } else {
-        if (prng.randf() < 0.5) {
+        if (coin_flip()) {
           lattice.spins[i] *= -1;
         }
       }
