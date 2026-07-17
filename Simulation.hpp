@@ -87,65 +87,83 @@ struct Simulation {
     std::fill(first_spinop.begin(), first_spinop.end(), -1);
     std::fill(last_spinop.begin(), last_spinop.end(), -1);
 
-    for (uint32_t op_index = 0; op_index < expansion_cutoff; ++op_index) {
+    // Hoist members into locals/raw pointers: stores through the vectors
+    // would otherwise force reloads of prng state and counters (aliasing).
+    auto local_prng = prng;
+    auto opcount = current_opcount;
+    const auto cutoff = expansion_cutoff;
+    const auto local_aprob = aprob;
+    const uint64_t nbonds = lattice.nbonds;
+    Op *const ops = opstring.data();
+    const Bond *const bonds = lattice.bondsites.data();
+    int8_t *const spins = lattice.spins.data();
+    IntegerType *const vlist = vertexlist.data();
+    IntegerType *const firstop = first_spinop.data();
+    IntegerType *const lastop = last_spinop.data();
+
+    for (uint32_t op_index = 0; op_index < cutoff; ++op_index) {
       IntegerType bond_index;
 
-      if (opstring[op_index].optype == IDENTITY) {
+      if (ops[op_index].optype == IDENTITY) {
         // Lemire-style bounded pick: avoids float multiply + float->int cast.
         bond_index = static_cast<IntegerType>(
-            (static_cast<uint64_t>(prng.rand_32()) * lattice.nbonds) >> 32);
-        auto bond = lattice.bondsites[bond_index];
-        if (lattice.spins[bond.s1] != lattice.spins[bond.s2] &&
-            prng.randf() * (expansion_cutoff - current_opcount) <= aprob) {
-          opstring[op_index].optype = DIAGONAL;
-          opstring[op_index].opbond = bond_index;
-          current_opcount += 1;
+            (static_cast<uint64_t>(local_prng.rand_32()) * nbonds) >> 32);
+        auto bond = bonds[bond_index];
+        if (spins[bond.s1] != spins[bond.s2] &&
+            local_prng.randf() * (cutoff - opcount) <= local_aprob) {
+          ops[op_index].optype = DIAGONAL;
+          ops[op_index].opbond = bond_index;
+          opcount += 1;
         } else {
-          vertexlist[op_index << 2] = -1;
+          vlist[op_index << 2] = -1;
           continue;
         }
       }
 
-      else if (opstring[op_index].optype == DIAGONAL) {
-        if (aprob * prng.randf() <= (expansion_cutoff - current_opcount + 1)) {
-          opstring[op_index].optype = IDENTITY;
-          current_opcount -= 1;
-          vertexlist[op_index << 2] = -1;
+      else if (ops[op_index].optype == DIAGONAL) {
+        if (local_aprob * local_prng.randf() <= (cutoff - opcount + 1)) {
+          ops[op_index].optype = IDENTITY;
+          opcount -= 1;
+          vlist[op_index << 2] = -1;
           continue;
         }
-        bond_index = opstring[op_index].opbond;
+        bond_index = ops[op_index].opbond;
       }
 
       else {
-        bond_index = opstring[op_index].opbond;
-        flip_spins(lattice.bondsites[bond_index]);
+        bond_index = ops[op_index].opbond;
+        spins[bonds[bond_index].s1] *= -1;
+        spins[bonds[bond_index].s2] *= -1;
       }
 
       // Link this (non-identity) op's four vertex legs.
       IntegerType v0 = op_index << 2;
-      auto s1 = lattice.bondsites[bond_index].s1;
-      auto s2 = lattice.bondsites[bond_index].s2;
+      auto s1 = bonds[bond_index].s1;
+      auto s2 = bonds[bond_index].s2;
 
-      auto v1 = last_spinop[s1];
-      auto v2 = last_spinop[s2];
+      auto v1 = lastop[s1];
+      auto v2 = lastop[s2];
 
       if (v1 != -1) {
-        vertexlist[v1] = v0;
-        vertexlist[v0] = v1;
+        vlist[v1] = v0;
+        vlist[v0] = v1;
       } else {
-        first_spinop[s1] = v0;
+        firstop[s1] = v0;
       }
 
       if (v2 != -1) {
-        vertexlist[v2] = v0 + 1;
-        vertexlist[v0 + 1] = v2;
+        vlist[v2] = v0 + 1;
+        vlist[v0 + 1] = v2;
       } else {
-        first_spinop[s2] = v0 + 1;
+        firstop[s2] = v0 + 1;
       }
 
-      last_spinop[s1] = v0 + 2;
-      last_spinop[s2] = v0 + 3;
+      lastop[s1] = v0 + 2;
+      lastop[s2] = v0 + 3;
     } // endloop
+
+    prng = local_prng;
+    current_opcount = opcount;
 
     for (auto s1 = 0; s1 < lattice.n_active_sites; s1++) {
       auto v1 = first_spinop[s1];
@@ -158,16 +176,31 @@ struct Simulation {
   }
 
   void loop_update() {
-    for (auto v0 = 0; v0 < 4 * expansion_cutoff; v0 += 4) {
-      if (vertexlist[v0] < 0) {
+    IntegerType *const vlist = vertexlist.data();
+    Op *const ops = opstring.data();
+
+    for (IntegerType v0 = 0; v0 < 4 * (IntegerType)expansion_cutoff; v0 += 4) {
+      if (vlist[v0] < 0) {
         continue;
       }
 
-      auto v1 = v0;
+      IntegerType v1 = v0;
       if (coin_flip()) {
-        flip_loop(v0, v1);
+        do {
+          ops[v1 >> 2].optype =
+              static_cast<optype_t>(ops[v1 >> 2].optype ^ OFF_DIAGONAL);
+          vlist[v1] = -2;
+          IntegerType v2 = v1 ^ 1;
+          v1 = vlist[v2];
+          vlist[v2] = -2;
+        } while (v1 != v0);
       } else {
-        visit_loop(v0, v1);
+        do {
+          vlist[v1] = -1;
+          IntegerType v2 = v1 ^ 1;
+          v1 = vlist[v2];
+          vlist[v2] = -1;
+        } while (v1 != v0);
       }
     }
 
@@ -276,36 +309,6 @@ struct Simulation {
     local_susc_measurement_count = 0;
     std::fill(local_susceptibilities.begin(), local_susceptibilities.end(), 0.0);
   }
-  _INLINE void flip_loop(IntegerType v0, IntegerType v1) {
-    do {
-      assert(v0 >= 0);
-      assert(v1 >= 0);
-      opstring[v1 >> 2].optype =
-          static_cast<optype_t>(opstring[v1 >> 2].optype ^ OFF_DIAGONAL);
-
-      vertexlist[v1] = -2;
-      IntegerType v2 = v1 ^ 1;
-      v1 = vertexlist[v2];
-      vertexlist[v2] = -2;
-    } while (v1 != v0);
-  }
-
-  _INLINE void visit_loop(IntegerType v0, IntegerType v1) {
-    do {
-      assert(v0 >= 0);
-      assert(v1 >= 0);
-      vertexlist[v1] = -1;
-      IntegerType v2 = v1 ^ 1;
-      v1 = vertexlist[v2];
-      vertexlist[v2] = -1;
-    } while (v1 != v0);
-  }
-
-  _INLINE void flip_spins(Bond &b) {
-    lattice.spins[b.s1] *= -1;
-    lattice.spins[b.s2] *= -1;
-  }
-
   void run(std::ofstream &outputfile) {
 
     outputfile << "Initial cutoff: " << expansion_cutoff << "\n";
