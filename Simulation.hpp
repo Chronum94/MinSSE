@@ -63,20 +63,27 @@ struct Simulation {
   std::vector<IntegerType> last_spinop;
   std::vector<IntegerType> vertexlist;
 
-  void diagonal_update() {
+  // Fused diagonal update + vertex linking: the op type at index i is final
+  // once the diagonal update passes it, so we can build the linked vertex
+  // list in the same sweep instead of re-walking the opstring.
+  void diagonal_update_and_link() {
+    std::fill(first_spinop.begin(), first_spinop.end(), -1);
+    std::fill(last_spinop.begin(), last_spinop.end(), -1);
 
     for (uint32_t op_index = 0; op_index < expansion_cutoff; ++op_index) {
-      if (opstring[op_index].optype == IDENTITY) {
-        auto bond_index =
-            static_cast<IntegerType>(prng.randf() * lattice.nbonds);
-        if (lattice.spins[lattice.bondsites[bond_index].s1] !=
-            lattice.spins[lattice.bondsites[bond_index].s2]) {
+      IntegerType bond_index;
 
-          if (prng.randf() * (expansion_cutoff - current_opcount) <= aprob) {
-            opstring[op_index].optype = DIAGONAL;
-            opstring[op_index].opbond = bond_index;
-            current_opcount += 1;
-          }
+      if (opstring[op_index].optype == IDENTITY) {
+        bond_index = static_cast<IntegerType>(prng.randf() * lattice.nbonds);
+        auto bond = lattice.bondsites[bond_index];
+        if (lattice.spins[bond.s1] != lattice.spins[bond.s2] &&
+            prng.randf() * (expansion_cutoff - current_opcount) <= aprob) {
+          opstring[op_index].optype = DIAGONAL;
+          opstring[op_index].opbond = bond_index;
+          current_opcount += 1;
+        } else {
+          vertexlist[op_index << 2] = -1;
+          continue;
         }
       }
 
@@ -84,54 +91,42 @@ struct Simulation {
         if (aprob * prng.randf() <= (expansion_cutoff - current_opcount + 1)) {
           opstring[op_index].optype = IDENTITY;
           current_opcount -= 1;
+          vertexlist[op_index << 2] = -1;
+          continue;
         }
+        bond_index = opstring[op_index].opbond;
       }
 
       else {
-        auto bond_index = opstring[op_index].opbond;
+        bond_index = opstring[op_index].opbond;
         flip_spins(lattice.bondsites[bond_index]);
       }
+
+      // Link this (non-identity) op's four vertex legs.
+      IntegerType v0 = op_index << 2;
+      auto s1 = lattice.bondsites[bond_index].s1;
+      auto s2 = lattice.bondsites[bond_index].s2;
+
+      auto v1 = last_spinop[s1];
+      auto v2 = last_spinop[s2];
+
+      if (v1 != -1) {
+        vertexlist[v1] = v0;
+        vertexlist[v0] = v1;
+      } else {
+        first_spinop[s1] = v0;
+      }
+
+      if (v2 != -1) {
+        vertexlist[v2] = v0 + 1;
+        vertexlist[v0 + 1] = v2;
+      } else {
+        first_spinop[s2] = v0 + 1;
+      }
+
+      last_spinop[s1] = v0 + 2;
+      last_spinop[s2] = v0 + 3;
     } // endloop
-  }
-
-  void link_vertices() {
-    std::fill(first_spinop.begin(), first_spinop.end(), -1);
-    std::fill(last_spinop.begin(), last_spinop.end(), -1);
-
-    for (int v0 = 0; v0 < 4 * expansion_cutoff; v0 += 4) {
-      auto op_index = v0 >> 2;
-
-      if (opstring[op_index].optype != IDENTITY) {
-        auto bond_index = opstring[op_index].opbond;
-
-        auto s1 = lattice.bondsites[bond_index].s1;
-        auto s2 = lattice.bondsites[bond_index].s2;
-
-        auto v1 = last_spinop[s1];
-        auto v2 = last_spinop[s2];
-
-        if (v1 != -1) {
-          vertexlist[v1] = v0;
-          vertexlist[v0] = v1;
-        } else {
-          first_spinop[s1] = v0;
-        }
-
-        if (v2 != -1) {
-          vertexlist[v2] = v0 + 1;
-          vertexlist[v0 + 1] = v2;
-        } else {
-          first_spinop[s2] = v0 + 1;
-        }
-
-        last_spinop[s1] = v0 + 2;
-        last_spinop[s2] = v0 + 3;
-      }
-
-      else {
-        std::fill(vertexlist.begin() + v0, vertexlist.begin() + v0 + 4, -1);
-      }
-    }
 
     for (auto s1 = 0; s1 < lattice.n_active_sites; s1++) {
       auto v1 = first_spinop[s1];
@@ -200,19 +195,23 @@ struct Simulation {
     // We would like to not flip the original spins... I think.
     std::copy(lattice.spins.begin(), lattice.spins.end(), spins_copy.begin());
     // Sum over the local susceptibility at each step in the MC sweep.
-    for(auto op_index = 0; op_index < expansion_cutoff; op_index++) {
-      if (opstring[op_index].optype == OFF_DIAGONAL) {
-        auto bond = lattice.bondsites[opstring[op_index].opbond];
+    IntegerType countdown = 0; // fires at op_index 0, matching op_index % interval == 0
+    for (auto op_index = 0; op_index < expansion_cutoff; op_index++) {
+      const auto op = opstring[op_index];
+      if (op.optype == OFF_DIAGONAL) {
+        auto bond = lattice.bondsites[op.opbond];
         spins_copy[bond.s1] *= -1;
         spins_copy[bond.s2] *= -1;
       }
 
-      if (op_index % intrasweep_measurement_interval == 0) {
+      if (countdown == 0) {
+        countdown = intrasweep_measurement_interval;
         local_susc_measurement_count += 1;
         for (auto i = 0; i < lattice.n_active_sites; i++) {
           local_susceptibilities[i] += spins_copy[i] * sum_of_spins;
         }
       }
+      countdown -= 1;
     }
 
   }
@@ -287,8 +286,7 @@ struct Simulation {
 
     outputfile << "Initial cutoff: " << expansion_cutoff << "\n";
     for (auto j = 0; j < sim_input.isteps; j++) {
-      diagonal_update();
-      link_vertices();
+      diagonal_update_and_link();
       loop_update();
       adjust_expansion_cutoff_linear(j);
     }
@@ -309,8 +307,7 @@ struct Simulation {
 
     for (auto i = 0; i < sim_input.nbins; i++) {
       for (auto j = 0; j < sim_input.msteps; j++) {
-        diagonal_update();
-        link_vertices();
+        diagonal_update_and_link();
         loop_update();
         measure();
       }
