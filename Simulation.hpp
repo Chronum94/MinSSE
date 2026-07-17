@@ -40,7 +40,6 @@ struct Simulation {
     vertexlist.resize(4 * expansion_cutoff, -1);
 
     spins_copy.resize(lattice.n_active_sites, 0);
-    snapshot_acc.resize(lattice.n_active_sites, 0);
     local_susceptibilities.resize(lattice.n_active_sites, 0.0);
   }
   SimulationInput<IntegerType, FloatType> sim_input;
@@ -56,7 +55,6 @@ struct Simulation {
   FloatType energy1;
   std::vector<FloatType> local_susceptibilities;
   std::vector<int8_t> spins_copy;
-  std::vector<IntegerType> snapshot_acc;
   IntegerType intrasweep_measurement_interval;
   IntegerType local_susc_measurement_count = 0;
 
@@ -250,13 +248,10 @@ struct Simulation {
 
     // We would like to not flip the original spins... I think.
     std::copy(lattice.spins.begin(), lattice.spins.end(), spins_copy.begin());
-    // Accumulate spin snapshots in integers; multiply by sum_of_spins once
-    // per sweep instead of once per snapshot (all values are exact ints).
-    std::fill(snapshot_acc.begin(), snapshot_acc.end(), 0);
     const Op *const ops = opstring.data();
     const Bond *const bonds = lattice.bondsites.data();
     int8_t *const scopy = spins_copy.data();
-    IntegerType *const acc = snapshot_acc.data();
+    FloatType *const lsusc = local_susceptibilities.data();
     const IntegerType nsites = lattice.n_active_sites;
     const uint32_t cutoff = expansion_cutoff;
 
@@ -273,14 +268,10 @@ struct Simulation {
         countdown = intrasweep_measurement_interval;
         local_susc_measurement_count += 1;
         for (IntegerType i = 0; i < nsites; i++) {
-          acc[i] += scopy[i];
+          lsusc[i] += scopy[i] * sum_of_spins;
         }
       }
       countdown -= 1;
-    }
-
-    for (auto i = 0; i < lattice.n_active_sites; i++) {
-      local_susceptibilities[i] += snapshot_acc[i] * sum_of_spins;
     }
   }
 
