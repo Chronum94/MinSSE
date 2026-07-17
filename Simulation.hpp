@@ -39,7 +39,8 @@ struct Simulation {
     last_spinop.resize(lattice.n_active_sites, -1);
     vertexlist.resize(4 * expansion_cutoff, -1);
 
-    spins_copy.resize(lattice.n_active_sites, 0.0);
+    spins_copy.resize(lattice.n_active_sites, 0);
+    snapshot_acc.resize(lattice.n_active_sites, 0);
     local_susceptibilities.resize(lattice.n_active_sites, 0.0);
   }
   SimulationInput<IntegerType, FloatType> sim_input;
@@ -54,7 +55,8 @@ struct Simulation {
   FloatType ususc;
   FloatType energy1;
   std::vector<FloatType> local_susceptibilities;
-  std::vector<IntegerType> spins_copy;
+  std::vector<int8_t> spins_copy;
+  std::vector<IntegerType> snapshot_acc;
   IntegerType intrasweep_measurement_interval;
   IntegerType local_susc_measurement_count = 0;
 
@@ -211,7 +213,9 @@ struct Simulation {
 
     // We would like to not flip the original spins... I think.
     std::copy(lattice.spins.begin(), lattice.spins.end(), spins_copy.begin());
-    // Sum over the local susceptibility at each step in the MC sweep.
+    // Accumulate spin snapshots in integers; multiply by sum_of_spins once
+    // per sweep instead of once per snapshot (all values are exact ints).
+    std::fill(snapshot_acc.begin(), snapshot_acc.end(), 0);
     IntegerType countdown = 0; // fires at op_index 0, matching op_index % interval == 0
     for (auto op_index = 0; op_index < expansion_cutoff; op_index++) {
       const auto op = opstring[op_index];
@@ -225,12 +229,15 @@ struct Simulation {
         countdown = intrasweep_measurement_interval;
         local_susc_measurement_count += 1;
         for (auto i = 0; i < lattice.n_active_sites; i++) {
-          local_susceptibilities[i] += spins_copy[i] * sum_of_spins;
+          snapshot_acc[i] += spins_copy[i];
         }
       }
       countdown -= 1;
     }
 
+    for (auto i = 0; i < lattice.n_active_sites; i++) {
+      local_susceptibilities[i] += snapshot_acc[i] * sum_of_spins;
+    }
   }
 
   void finalize_and_write_results(std::ofstream &outfile, std::ofstream &locsuscfile, unsigned int bin_number) {
