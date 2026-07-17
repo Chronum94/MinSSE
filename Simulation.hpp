@@ -93,6 +93,8 @@ struct Simulation {
     auto opcount = current_opcount;
     const auto cutoff = expansion_cutoff;
     const auto local_aprob = aprob;
+    const uint64_t aprob_x2_32 =
+        static_cast<uint64_t>(local_aprob * 4294967296.0);
     const uint64_t nbonds = lattice.nbonds;
     Op *const ops = opstring.data();
     const Bond *const bonds = lattice.bondsites.data();
@@ -109,8 +111,10 @@ struct Simulation {
         bond_index = static_cast<IntegerType>(
             (static_cast<uint64_t>(local_prng.rand_32()) * nbonds) >> 32);
         auto bond = bonds[bond_index];
+        // All-integer acceptance test: u/2^32 * (M-n) <= aprob, scaled by 2^32.
         if (spins[bond.s1] != spins[bond.s2] &&
-            local_prng.randf() * (cutoff - opcount) <= local_aprob) {
+            static_cast<uint64_t>(local_prng.rand_32()) * (cutoff - opcount) <=
+                aprob_x2_32) {
           ops[op_index].optype = DIAGONAL;
           ops[op_index].opbond = bond_index;
           opcount += 1;
@@ -249,20 +253,27 @@ struct Simulation {
     // Accumulate spin snapshots in integers; multiply by sum_of_spins once
     // per sweep instead of once per snapshot (all values are exact ints).
     std::fill(snapshot_acc.begin(), snapshot_acc.end(), 0);
+    const Op *const ops = opstring.data();
+    const Bond *const bonds = lattice.bondsites.data();
+    int8_t *const scopy = spins_copy.data();
+    IntegerType *const acc = snapshot_acc.data();
+    const IntegerType nsites = lattice.n_active_sites;
+    const uint32_t cutoff = expansion_cutoff;
+
     IntegerType countdown = 0; // fires at op_index 0, matching op_index % interval == 0
-    for (auto op_index = 0; op_index < expansion_cutoff; op_index++) {
-      const auto op = opstring[op_index];
+    for (uint32_t op_index = 0; op_index < cutoff; op_index++) {
+      const auto op = ops[op_index];
       if (op.optype == OFF_DIAGONAL) {
-        auto bond = lattice.bondsites[op.opbond];
-        spins_copy[bond.s1] *= -1;
-        spins_copy[bond.s2] *= -1;
+        auto bond = bonds[op.opbond];
+        scopy[bond.s1] *= -1;
+        scopy[bond.s2] *= -1;
       }
 
       if (countdown == 0) {
         countdown = intrasweep_measurement_interval;
         local_susc_measurement_count += 1;
-        for (auto i = 0; i < lattice.n_active_sites; i++) {
-          snapshot_acc[i] += spins_copy[i];
+        for (IntegerType i = 0; i < nsites; i++) {
+          acc[i] += scopy[i];
         }
       }
       countdown -= 1;
